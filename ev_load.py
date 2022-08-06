@@ -1,6 +1,9 @@
+'''
+    locust -f ev_load.py EvLocus --host https://stgevspcharger.uplus.co.kr
+
+'''
 from locust import HttpUser,TaskSet, SequentialTaskSet,between
 import json, random, datetime
-from collections import deque
 
 from locust.user import task
 
@@ -54,8 +57,49 @@ urls = {
     "statusNotification": chost + "/api/v1/OCPP/statusNotification/999332",
 }
 
+conn = None
 client_list = [i for i in range(client_size)]
 using_clients = list()
+
+def getConnection():
+    import pymysql
+    conn = pymysql.connect(host="rds-aurora-mysql-ev-charger-svc-instance-0.cnjsh2ose5fj.ap-northeast-2.rds.amazonaws.com",
+                           user='evsp_usr', password='evspuser!!', db='evsp', charset='utf8', port=3306)
+
+def getCards():
+
+    with conn.cursor() as cur:
+        cur.execute(" select b.mbr_card_no "+
+                    " from mbr_info a "+
+                    " inner join mbr_card_isu_info b "+
+                    " on a.mbr_id = b.mbr_id "+
+                    " where b.card_stus_cd = '01'")
+        return cur.fetchall()
+
+
+def getCrgrs(chrstn_id = None):
+
+    with conn.cursor() as cur:
+        sql = " select b.crgr_cid " \
+              " from crgr_mstr_info a " \
+              " inner join crgr_info b " \
+              " on a.crgr_mid = b.crgr_mid " \
+              " where a.crgr_stus_cd = '04' and b.crgr_cid like '%A'"
+
+        if chrstn_id :
+            sql = sql + f" and a.chrstn_id = '{chrstn_id}' "
+        cur.execute(sql)
+
+        return cur.fetchall()
+
+def login(self, userid, password):
+    import requests
+    data = {"userId": userid, "userPw": password}
+    response = requests.post(urls["login"], headers=props.headers,
+                             data=json.dumps(data))
+    response_dict = json.loads(response.text)
+    self.accessToken = response_dict["payload"]["accessToken"]
+
 
 def get_req_data(req, *args):
 
@@ -107,7 +151,7 @@ class EvTaskSet(TaskSet):
         req_name = "statusNotification"
         req = get_req_data(req_name, "Available")
 
-        response = self.client.post(
+        self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
@@ -232,4 +276,4 @@ class EvTaskSequential(SequentialTaskSet):
 
 class EvLocus(HttpUser):
     tasks =[EvTaskSequential]
-    wait_time = between(0.1,0.5)
+    wait_time = between(0.3,0.5)
