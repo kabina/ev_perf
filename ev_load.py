@@ -7,7 +7,36 @@ import json, random, datetime
 
 from locust.user import task
 
-client_size = 2
+client_size = 50
+userIds = [
+    'gabardine28@voltup.com','gabbro13@voltup.com',
+    'gabbro73@voltup.com','gaberones25@voltup.com',
+    'gaberones39@voltup.com','gable53@voltup.com',
+    'gable82@voltup.com','gabriel1@voltup.com',
+    'gabriel73@voltup.com','gabrielle19@voltup.com',
+    'gabrielle23@voltup.com','gabrielle29@voltup.com',
+    'gabrielle8@voltup.com','gad41@voltup.com',
+    'gad49@voltup.com','gadget48@voltup.com',
+    'gadgetry13@voltup.com','gadolinium51@voltup.com',
+    'gadwall12@voltup.com','gaff19@voltup.com',
+    'gaffe95@voltup.com','gag23@voltup.com',
+    'gagging73@voltup.com','gagging90@voltup.com',
+    'gagging96@voltup.com','gagwriter56@voltup.com',
+    'gaiety7@voltup.com','gail17@voltup.com',
+    'gail50@voltup.com','gaillardia26@voltup.com',
+    'gaillardia54@voltup.com','gaillardia7@voltup.com',
+    'gaillardia81@voltup.com','gain32@voltup.com',
+    'gain98@voltup.com','gaines1@voltup.com',
+    'gaines48@voltup.com','gainesville5@voltup.com',
+    'gainesville88@voltup.com','gait2@voltup.com',
+    'gait38@voltup.com','gait94@voltup.com',
+    'gaithersburg16@voltup.com','gal83@voltup.com',
+    'galactose37@voltup.com','galapagos45@voltup.com',
+    'galaxy71@voltup.com','galbreath13@voltup.com',
+    'galbreath37@voltup.com','galbreath66@voltup.com',
+    ]
+
+userPasswords = []
 
 idTags = [
     '4382308400316372',  '4531031214984422',    '4114323326597027',  '4931668367673172',
@@ -92,13 +121,14 @@ def getCrgrs(chrstn_id = None):
 
         return cur.fetchall()
 
-def login(self, userid, password):
+def login():
     import requests
-    data = {"userId": userid, "userPw": password}
-    response = requests.post(urls["login"], headers=props.headers,
-                             data=json.dumps(data))
+    req = get_req_data("login")
+    response = requests.post(urls["login"], headers=req["header"],
+                             data=json.dumps(req["data"]))
     response_dict = json.loads(response.text)
-    self.accessToken = response_dict["payload"]["accessToken"]
+
+    return response_dict["payload"]["accessToken"]
 
 
 def get_req_data(req, *args):
@@ -117,6 +147,8 @@ def get_req_data(req, *args):
 
     if req == "authorize" :
         body = {'idTag': f'{idTags[target]}'}
+    elif req == "login":
+        body = {"userId": userIds[target], "userPw": 'cdee881ecc6386ce6ec19698e5bb6c6603e4550c15303c87a21ee34604056fc2'}
     elif req == "statusNotification":
         body = {'connectorId': '0', 'errorCode': 'NoError', 'info': {'reason': 'None', 'cpv': 100, 'rv': 11},
                 'status': args[0], 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
@@ -146,6 +178,11 @@ def get_req_data(req, *args):
 class EvTaskSet(TaskSet):
 
     tid = None
+    accessToken = None
+
+    def on_start(self):
+        accessToken = login()
+
     @task
     def statusNotification(self):
         req_name = "statusNotification"
@@ -159,7 +196,6 @@ class EvTaskSet(TaskSet):
             name=req_name,
         )
 
-
 class EvTaskSequential(SequentialTaskSet):
 
     tid = None
@@ -168,7 +204,7 @@ class EvTaskSequential(SequentialTaskSet):
         req_name = "statusNotification"
         req = get_req_data(req_name, "Available")
 
-        response = self.client.post(
+        self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
@@ -274,6 +310,10 @@ class EvTaskSequential(SequentialTaskSet):
         )
 
 
-class EvLocus(HttpUser):
+class WebUser(HttpUser):
+    tasks =[EvTaskSet]
+    wait_time = between(0.3,0.5)
+
+class Charger(HttpUser):
     tasks =[EvTaskSequential]
     wait_time = between(0.3,0.5)
