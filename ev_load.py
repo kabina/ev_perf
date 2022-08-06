@@ -71,21 +71,25 @@ crgrList = [
 
 ]
 
-#chost = "https://devevspcharger.uplus.co.kr"
-chost = ""
+charger_host = "https://stgevspcharger.uplus.co.kr"
+service_host = "https://devevspcharger.uplus.co.kr"
 
 urls = {
-    "authorize":chost+"/api/v1/OCPP/authorize/999332",
-    "bootNotification":chost+"/api/v1/OCPP/bootNotification/999332",
-    "heartbeat":chost+"/api/v1/OCPP/dataTransfer/999332",
-    "prepare":chost+"/api/v1/OCPP/statusNotification/999332",
-    "tariff":chost+"/api/v1/OCPP/dataTransfer/999332",
-    "startTransaction":chost+"/api/v1/OCPP/startTransaction/999332",
-    "stopTransaction":chost+"/api/v1/OCPP/stopTransaction/999332",
-    "meterValues":chost+"/api/v1/OCPP/meterValues/999332",
-    "statusNotification": chost + "/api/v1/OCPP/statusNotification/999332",
-}
+    "authorize":charger_host+"/api/v1/OCPP/authorize/999332",
+    "bootNotification":charger_host+"/api/v1/OCPP/bootNotification/999332",
+    "heartbeat":charger_host+"/api/v1/OCPP/dataTransfer/999332",
+    "prepare":charger_host+"/api/v1/OCPP/statusNotification/999332",
+    "tariff":charger_host+"/api/v1/OCPP/dataTransfer/999332",
+    "startTransaction":charger_host+"/api/v1/OCPP/startTransaction/999332",
+    "stopTransaction":charger_host+"/api/v1/OCPP/stopTransaction/999332",
+    "meterValues":charger_host+"/api/v1/OCPP/meterValues/999332",
+    "statusNotification": charger_host + "/api/v1/OCPP/statusNotification/999332",
 
+    "svc_authorize": service_host + "/api/v1/OCPP/authorize/999332",
+    "svc_bootNotification": service_host + "/api/v1/OCPP/bootNotification/999332",
+    "svc_tariff": service_host + "/api/v1/OCPP/dataTransfer/999332",
+    "svc_statusNotification": service_host + "/api/v1/OCPP/statusNotification/999332",
+}
 conn = None
 client_list = [i for i in range(client_size)]
 using_clients = list()
@@ -180,16 +184,28 @@ class EvTaskSet(TaskSet):
     tid = None
     accessToken = None
 
-    def on_start(self):
-        accessToken = login()
+    # def on_start(self):
+    #     accessToken = login()
 
     @task
-    def statusNotification(self):
+    def svcStatusNotification(self):
         req_name = "statusNotification"
         req = get_req_data(req_name, "Available")
 
         self.client.post(
-            url=urls[req_name],
+            url=urls['svc_'+req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+    @task
+    def svcTariff(self):
+        req_name = "tariff"
+        req = get_req_data(req_name)
+
+        self.client.post(
+            url=urls['svc_'+req_name],
             data=json.dumps(req["body"]),
             auth=None,
             headers=req["header"],
@@ -315,5 +331,5 @@ class WebUser(HttpUser):
     wait_time = between(0.3,0.5)
 
 class Charger(HttpUser):
-    tasks =[EvTaskSequential]
+    tasks =[EvTaskSequential, EvTaskSet]
     wait_time = between(0.3,0.5)
