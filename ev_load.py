@@ -106,6 +106,7 @@ urls = {
     "retrieveDeferredPaymentCardInfo": service_host + "/api/v1/CFN/retrieveDeferredPaymentCardInfo",
     "insertOrder": service_host + "/pub-api/v1/ORDER/insertOrder",
     "updateOrder": service_host + "/pub-api/v1/ORDER/updateOrder",
+    "sendStartChargeStatus": service_host + "/pub-api/v1/HMN/sendStartChargeStatus",
 }
 conn = None
 client_list = [i for i in range(client_size)]
@@ -156,7 +157,7 @@ def login():
     # return response_dict["data"]["payload"]["accessToken"]
 
 
-def get_req_data(req, *args):
+def get_req_data(req, *args, **kwargs):
 
     while True:
         target = random.choice(client_list)
@@ -191,6 +192,9 @@ def get_req_data(req, *args):
     elif req == "updateOrder":
         body = {"ordrNo":args[0],"ordrRsltCd":"03"}
 
+    elif req == "sendStartChargeStatus":
+        body = {"ordrNo":args[0]}
+
     elif req == "statusNotification":
         body = {'connectorId': '0', 'errorCode': 'NoError', 'info': {'reason': 'None', 'cpv': 100, 'rv': 11},
                 'status': args[0], 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
@@ -200,10 +204,10 @@ def get_req_data(req, *args):
                 'data': {'connectorId': '0', 'idTag': idTags[target],
                          'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}'}}
     elif req == "startTransaction":
-        body = {'idTag': idTags[target], 'connectorId': '0', 'meterStart': 109065,
-                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}'}
+        body = {'idTag': idTags[target], 'connectorId': '0', 'meterStart': 1090,
+                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}', 'reservationId':args[0]}
     elif req == "stopTransaction":
-        body = {'idTag': idTags[target], 'meterStop': 111136, 'reason': 'Finished',
+        body = {'idTag': idTags[target], 'meterStop': 1111, 'reason': 'Finished',
         'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}', 'transactionId': '202207031120000120005'}
     elif req == "meterValues":
         body = {'connectorId': '0', 'transactionId': args[0],
@@ -321,6 +325,33 @@ class EvMobileTaskSequence(SequentialTaskSet):
         )
 
     @task
+    def sendStartChargeStatus(self):
+        req_name = "sendStartChargeStatus"
+        req = get_req_data(req_name, self.tid)
+
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+    @task
+    def startTransaction(self):
+        req_name = "startTransaction"
+        req = get_req_data(req_name, self.tid)
+        response = self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+        self.tid = response.json()['transactionId']
+
+
+    @task
     def statusNotificationCharging(self):
         req_name = "statusNotification"
         req = get_req_data(req_name, "Charging")
@@ -332,7 +363,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
             name=req_name,
         )
 
-    @task
+    @task(3)
     def meterValues(self):
         req_name = "meterValues"
         req = get_req_data(req_name, self.tid)
@@ -343,8 +374,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
-        print(req["body"])
-        print(response.json())
+
 
     @task
     def stopTransaction(self):
@@ -374,6 +404,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
 class EvTaskSequential(SequentialTaskSet):
 
     tid = None
+    lid = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}_card"
     @task
     def statusNotificationAvailable(self):
         req_name = "statusNotification"
@@ -426,7 +457,7 @@ class EvTaskSequential(SequentialTaskSet):
     @task
     def startTransaction(self):
         req_name = "startTransaction"
-        req = get_req_data(req_name)
+        req = get_req_data(req_name, None)
         response = self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -491,6 +522,6 @@ class WebUser(HttpUser):
 
 class Charger(HttpUser):
     # tasks ={EvTaskSequential:3, EvMobileTaskSequence:1}
-    tasks ={EvMobileTaskSequence:1, EvTaskSequential:5}
+    tasks =[EvMobileTaskSequence]
 
     wait_time = between(0.3,0.5)
