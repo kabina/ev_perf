@@ -206,9 +206,12 @@ def get_req_data(req, *args, **kwargs):
     elif req == "startTransaction":
         body = {'idTag': idTags[target], 'connectorId': '0', 'meterStart': 1090,
                 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}', 'reservationId':args[0]}
+    elif req == "heartbeat":
+        body = {"vendorId":"LGE", "messageId":"heartbeat",
+            "data":{"rssi":80,"snr":57, "rsrp":70 }}
     elif req == "stopTransaction":
         body = {'idTag': idTags[target], 'meterStop': 1111, 'reason': 'Finished',
-        'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}', 'transactionId': '202207031120000120005'}
+        'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}', 'transactionId': args[0]}
     elif req == "meterValues":
         body = {'connectorId': '0', 'transactionId': args[0],
                 'meterValue': [{'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}',
@@ -284,18 +287,18 @@ class EvMobileTaskSequence(SequentialTaskSet):
             name=req_name,
         )
 
-    @task
-    def retrieveDeferredPaymentCardInfo(self):
-        req_name = "retrieveDeferredPaymentCardInfo"
-        req = get_req_data(req_name)
-
-        response = self.client.post(
-            url=urls[req_name],
-            data=json.dumps(req["body"]),
-            auth=None,
-            headers=req["header"],
-            name=req_name,
-        )
+    # @task
+    # def retrieveDeferredPaymentCardInfo(self):
+    #     req_name = "retrieveDeferredPaymentCardInfo"
+    #     req = get_req_data(req_name)
+    #
+    #     response = self.client.post(
+    #         url=urls[req_name],
+    #         data=json.dumps(req["body"]),
+    #         auth=None,
+    #         headers=req["header"],
+    #         name=req_name,
+    #     )
 
     @task
     def insertOrder(self):
@@ -341,14 +344,13 @@ class EvMobileTaskSequence(SequentialTaskSet):
     def startTransaction(self):
         req_name = "startTransaction"
         req = get_req_data(req_name, self.tid)
-        response = self.client.post(
+        self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
             headers=req["header"],
             name=req_name,
         )
-        self.tid = response.json()['transactionId']
 
 
     @task
@@ -363,11 +365,11 @@ class EvMobileTaskSequence(SequentialTaskSet):
             name=req_name,
         )
 
-    @task(3)
+    @task(36)
     def meterValues(self):
         req_name = "meterValues"
         req = get_req_data(req_name, self.tid)
-        response = self.client.post(
+        self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
@@ -399,7 +401,17 @@ class EvMobileTaskSequence(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
-
+    @task(12)
+    def heartbeat(self):
+        req_name = "heartbeat"
+        req = get_req_data(req_name)
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
 
 class EvTaskSequential(SequentialTaskSet):
 
@@ -515,13 +527,24 @@ class EvTaskSequential(SequentialTaskSet):
             name=req_name,
         )
 
+    @task(12)
+    def heartbeat(self):
+        req_name = "heartbeat"
+        req = get_req_data(req_name)
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
 
 class WebUser(HttpUser):
     tasks =[EvMobileTaskSequence]
     wait_time = between(0.3,0.5)
 
 class Charger(HttpUser):
-    # tasks ={EvTaskSequential:3, EvMobileTaskSequence:1}
-    tasks =[EvMobileTaskSequence]
+    tasks ={EvTaskSequential:3, EvMobileTaskSequence:1}
+    # tasks =[EvMobileTaskSequence]
 
     wait_time = between(0.3,0.5)
