@@ -1,8 +1,8 @@
 import datetime
 
 client_size = 200
-charger_host = "https://stgevspcharger.uplus.co.kr"
-service_host = "https://api.stgevsp.uplus.co.kr"
+charger_host = "https://devevspcharger.uplus.co.kr"
+service_host = "https://api.devevsp.uplus.co.kr"
 deferred_host = "https://dev"
 
 def getConnection():
@@ -18,9 +18,9 @@ def getCards():
                     " from mbr_info a "+
                     " inner join mbr_card_isu_info b "+
                     " on a.mbr_id = b.mbr_id "+
-                    f" where b.card_stus_cd = '01' and b.mbr_card_no like '4%' limit {client_size}")
+                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'N' and b.mbr_card_no like '4%' limit {client_size}")
         fetches = cur.fetchall()
-        with open('idTags', 'w') as f:
+        with open('dataset/idTags', 'w') as f:
             for i in fetches:
                 f.write(f'{i[0]}\n')
 
@@ -31,9 +31,9 @@ def getUserIds():
     with conn.cursor() as cur:
         cur.execute(" select mbr_id "+
                     " from mbr_info a "+
-                    f" where a.mbr_stus_cd = '01' and a.mbr_id like 'n%' limit {client_size}")
+                    f" where a.mbr_stus_cd = '01' and a.mbr_id like 'k%' limit {client_size}")
         fetches = cur.fetchall()
-        with open('UserIds', 'w') as f:
+        with open('dataset/UserIds', 'w') as f:
             for i in fetches:
                 f.write(f'{i[0]}\n')
 
@@ -54,7 +54,7 @@ def getCrgrs(chrstn_id = None):
         cur.execute(sql)
 
         fetches = cur.fetchall()
-        with open('crgrList', 'w') as f:
+        with open('dataset/crgrList', 'w') as f:
             for i in fetches:
                 f.write(f'{i[0]}\n')
 

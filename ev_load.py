@@ -7,9 +7,19 @@ import json, random, datetime
 from locust.user import task
 from settings import get_req_dataset, urls
 
-client_size = 100
+client_size = 200
 client_list = [i for i in range(client_size)]
 using_clients = list()
+
+def get_target():
+    while True:
+        target = random.choice(client_list)
+        if target not in using_clients:
+            using_clients.append(target)
+            return target
+
+def remove_target(target):
+    using_clients.remove(target)
 
 class EvMobileTaskSequence(SequentialTaskSet):
 
@@ -22,12 +32,16 @@ class EvMobileTaskSequence(SequentialTaskSet):
     def get_req_data(self, *args, **kwargs):
         return get_req_dataset(*args, **kwargs, target=self.target)
 
-    def on_start(self):
-        while True:
-            self.target = random.choice(client_list)
-            if self.target not in using_clients:
-                using_clients.append(self.target)
-                break
+    @task
+    def login(self):
+        self.target = get_target()
+        # while True:
+        #     self.target = random.choice(client_list)
+        #     if self.target not in using_clients:
+        #         using_clients.append(self.target)
+        #         break
+        # print(f'App Client:{len(using_clients)}개')
+        # print(f'App {using_clients}')
 
         req_name = "login"
         req = self.get_req_data(req_name, init=True)
@@ -40,9 +54,6 @@ class EvMobileTaskSequence(SequentialTaskSet):
             name=req_name,
         )
         # accessToken = response.json()['data']['payload']['accessToken']
-
-    def on_stop(self):
-        using_clients.remove(self.target)
 
     @task
     def retrieveChargeStationInfo(self):
@@ -171,6 +182,8 @@ class EvMobileTaskSequence(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
+        remove_target(self.target)
+
     @task(12)
     def heartbeat(self):
         req_name = "heartbeat"
@@ -196,12 +209,10 @@ class EvTaskSequential(SequentialTaskSet):
 
     @task
     def statusNotificationAvailable(self):
-        while True:
-            self.target = random.choice(client_list)
-            if self.target not in using_clients:
-                using_clients.append(self.target)
-                break
-        print(f'실행 Client:{len(using_clients)}개')
+        self.target = get_target()
+
+        # print(f'Charger 실행 Client:{len(using_clients)}개')
+        # print(f'Charger {using_clients}')
 
         req_name = "statusNotification"
         req = self.get_req_data(req_name, "Available")
@@ -310,7 +321,7 @@ class EvTaskSequential(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
-        using_clients.remove(self.target)
+        remove_target(self.target)
 
     @task(12)
     def heartbeat(self):
@@ -330,6 +341,6 @@ class WebUser(HttpUser):
 
 class Charger(HttpUser):
     # tasks ={EvTaskSequential:3, EvMobileTaskSequence:1}
-    # tasks =[EvMobileTaskSequence]
-    tasks =[EvTaskSequential]
+    tasks =[EvMobileTaskSequence]
+    # tasks =[EvTaskSequential]
     wait_time = between(0.3,0.5)
