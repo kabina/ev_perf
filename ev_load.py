@@ -35,6 +35,18 @@ userIds = [
     'galaxy71@voltup.com','galbreath13@voltup.com',
     'galbreath37@voltup.com','galbreath66@voltup.com',
     ]
+userIds = [
+    "nheo.an@gmail.com","nheo.an@gmail.com","nheo.an@gmail.com","nheo.an@gmail.com","nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+    "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com", "nheo.an@gmail.com",
+]
 
 userPasswords = []
 
@@ -72,7 +84,9 @@ crgrList = [
 ]
 
 charger_host = "https://stgevspcharger.uplus.co.kr"
-service_host = "https://devevspcharger.uplus.co.kr"
+#service_host = "https://devevsp.uplus.co.kr"
+service_host = "https://api.stgevsp.uplus.co.kr"
+deferred_host = "https://dev"
 
 urls = {
     "authorize":charger_host+"/api/v1/OCPP/authorize/999332",
@@ -85,10 +99,13 @@ urls = {
     "meterValues":charger_host+"/api/v1/OCPP/meterValues/999332",
     "statusNotification": charger_host + "/api/v1/OCPP/statusNotification/999332",
 
-    "svc_authorize": service_host + "/api/v1/OCPP/authorize/999332",
-    "svc_bootNotification": service_host + "/api/v1/OCPP/bootNotification/999332",
-    "svc_tariff": service_host + "/api/v1/OCPP/dataTransfer/999332",
-    "svc_statusNotification": service_host + "/api/v1/OCPP/statusNotification/999332",
+    "validateMemberId": service_host+"/pub-api/v1/MIF/validateMemberId",
+    "login": service_host + "/cmm-api/v1/AUTH/login",
+    "retrieveChargeStationInfo": service_host + "/pub-api/v1/HMN/retrieveChargeStationInfo",
+    "retrieveChargerInfo": service_host + "/pub-api/v1/HMN/retrieveChargerInfo",
+    "retrieveDeferredPaymentCardInfo": service_host + "/api/v1/CFN/retrieveDeferredPaymentCardInfo",
+    "insertOrder": service_host + "/pub-api/v1/ORDER/insertOrder",
+    "updateOrder": service_host + "/pub-api/v1/ORDER/updateOrder",
 }
 conn = None
 client_list = [i for i in range(client_size)]
@@ -129,10 +146,14 @@ def login():
     import requests
     req = get_req_data("login")
     response = requests.post(urls["login"], headers=req["header"],
-                             data=json.dumps(req["data"]))
-    response_dict = json.loads(response.text)
+                             data=json.dumps(req["body"]))
 
-    return response_dict["payload"]["accessToken"]
+    # print(response.text)
+    # print(response.json())
+    #
+    # response_dict = response.json()
+    #
+    # return response_dict["data"]["payload"]["accessToken"]
 
 
 def get_req_data(req, *args):
@@ -151,8 +172,25 @@ def get_req_data(req, *args):
 
     if req == "authorize" :
         body = {'idTag': f'{idTags[target]}'}
+
+    elif req == "validateMemberId":
+        body = {"mbrId": userIds[target]}
+        header = {"Content-Type": "application/json"}
     elif req == "login":
-        body = {"userId": userIds[target], "userPw": 'cdee881ecc6386ce6ec19698e5bb6c6603e4550c15303c87a21ee34604056fc2'}
+        body = {"userId": userIds[target], "userPw": 'ah64jj3!'}
+        header = {"Content-Type": "application/json"}
+
+    elif req == "retrieveChargeStationInfo":
+        body = {"chrstnId": crgrList[target][:9]}
+    elif req == "retrieveChargerInfo":
+        body = {"crgrCid": crgrList[target]}
+    elif req == "retrieveDeferredPaymentCardInfo":
+        body = {}
+    elif req == "insertOrder":
+        body = {"reqEtfnQt":40,"reqEtfnAmt":9000,"chrstnId":crgrList[target][:9],"crgrCid":crgrList[target],"ordrDivsCd":"01","etfnUprcAmt":225,"serverFrom":"svc","etfnQt":40,"etfnAmt":9000,"ordrCntnCd":"01"}
+    elif req == "updateOrder":
+        body = {"ordrNo":args[0],"ordrRsltCd":"03"}
+
     elif req == "statusNotification":
         body = {'connectorId': '0', 'errorCode': 'NoError', 'info': {'reason': 'None', 'cpv': 100, 'rv': 11},
                 'status': args[0], 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
@@ -179,38 +217,159 @@ def get_req_data(req, *args):
     return {"header":header, "body":body}
 
 
-class EvTaskSet(TaskSet):
+class EvMobileTaskSequence(SequentialTaskSet):
 
     tid = None
     accessToken = None
 
     # def on_start(self):
     #     accessToken = login()
+    #     print(accessToken)
+
+    # @task
+    # def validateMemberId(self):
+    #     req_name = "validateMemberId"
+    #     req = get_req_data(req_name)
+    #
+    #     response =self.client.post(
+    #         url=urls[req_name],
+    #         data=json.dumps(req["body"]),
+    #         auth=None,
+    #         headers=req["header"],
+    #         name=req_name,
+    #     )
+    #     print(response)
 
     @task
-    def svcStatusNotification(self):
-        req_name = "statusNotification"
-        req = get_req_data(req_name, "Available")
+    def login(self):
+        req_name = "login"
+        req = get_req_data(req_name)
 
-        self.client.post(
-            url=urls['svc_'+req_name],
+        response =self.client.post(
+            url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
             headers=req["header"],
             name=req_name,
         )
+        accessToken = response.json()['data']['payload']['accessToken']
+
     @task
-    def svcTariff(self):
-        req_name = "tariff"
+    def retrieveChargeStationInfo(self):
+        req_name = "retrieveChargeStationInfo"
+        req = get_req_data(req_name)
+
+        response = self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+    @task
+    def retrieveChargerInfo(self):
+        req_name = "retrieveChargerInfo"
         req = get_req_data(req_name)
 
         self.client.post(
-            url=urls['svc_'+req_name],
+            url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
             headers=req["header"],
             name=req_name,
         )
+
+    @task
+    def retrieveDeferredPaymentCardInfo(self):
+        req_name = "retrieveDeferredPaymentCardInfo"
+        req = get_req_data(req_name)
+
+        response = self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+    @task
+    def insertOrder(self):
+        req_name = "insertOrder"
+        req = get_req_data(req_name)
+
+        response = self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+        self.tid = response.json()['ordrNo']
+
+    @task
+    def updateOrder(self):
+        req_name = "updateOrder"
+        req = get_req_data(req_name, self.tid)
+
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+    @task
+    def statusNotificationCharging(self):
+        req_name = "statusNotification"
+        req = get_req_data(req_name, "Charging")
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+    @task
+    def meterValues(self):
+        req_name = "meterValues"
+        req = get_req_data(req_name, self.tid)
+        response = self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+        print(req["body"])
+        print(response.json())
+
+    @task
+    def stopTransaction(self):
+        req_name = "stopTransaction"
+        req = get_req_data(req_name, self.tid)
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+    @task
+    def statusNotificationFinishing(self):
+        req_name = "statusNotification"
+        req = get_req_data(req_name, "Finishing")
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
 
 class EvTaskSequential(SequentialTaskSet):
 
@@ -327,9 +486,11 @@ class EvTaskSequential(SequentialTaskSet):
 
 
 class WebUser(HttpUser):
-    tasks =[EvTaskSet]
+    tasks =[EvMobileTaskSequence]
     wait_time = between(0.3,0.5)
 
 class Charger(HttpUser):
-    tasks =[EvTaskSequential, EvTaskSet]
+    # tasks ={EvTaskSequential:3, EvMobileTaskSequence:1}
+    tasks ={EvMobileTaskSequence:1, EvTaskSequential:5}
+
     wait_time = between(0.3,0.5)
