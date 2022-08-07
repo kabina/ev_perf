@@ -7,48 +7,7 @@ import json, random, datetime
 from locust.user import task
 from settings import get_req_dataset, urls
 
-
-conn = None
-
-def getConnection():
-    import pymysql
-    conn = pymysql.connect(host="rds-aurora-mysql-ev-charger-svc-instance-0.cnjsh2ose5fj.ap-northeast-2.rds.amazonaws.com",
-                           user='evsp_usr', password='evspuser!!', db='evsp', charset='utf8', port=3306)
-
-def getCards():
-
-    with conn.cursor() as cur:
-        cur.execute(" select b.mbr_card_no "+
-                    " from mbr_info a "+
-                    " inner join mbr_card_isu_info b "+
-                    " on a.mbr_id = b.mbr_id "+
-                    " where b.card_stus_cd = '01'")
-        return cur.fetchall()
-
-
-def getCrgrs(chrstn_id = None):
-
-    with conn.cursor() as cur:
-        sql = " select b.crgr_cid " \
-              " from crgr_mstr_info a " \
-              " inner join crgr_info b " \
-              " on a.crgr_mid = b.crgr_mid " \
-              " where a.crgr_stus_cd = '04' and b.crgr_cid like '%A'"
-
-        if chrstn_id :
-            sql = sql + f" and a.chrstn_id = '{chrstn_id}' "
-        cur.execute(sql)
-
-        return cur.fetchall()
-
-def login():
-    import requests
-    req = get_req_dataset("login")
-    response = requests.post(urls["login"], headers=req["header"],
-                             data=json.dumps(req["body"]))
-
-
-client_size = 50
+client_size = 100
 client_list = [i for i in range(client_size)]
 using_clients = list()
 
@@ -235,19 +194,15 @@ class EvTaskSequential(SequentialTaskSet):
     def get_req_data(self, *args, **kwargs):
         return get_req_dataset(*args, **kwargs, target=self.target)
 
-    def on_start(self):
+    @task
+    def statusNotificationAvailable(self):
         while True:
             self.target = random.choice(client_list)
             if self.target not in using_clients:
                 using_clients.append(self.target)
                 break
+        print(f'실행 Client:{len(using_clients)}개')
 
-
-    def on_stop(self):
-        using_clients.remove(self.target)
-
-    @task
-    def statusNotificationAvailable(self):
         req_name = "statusNotification"
         req = self.get_req_data(req_name, "Available")
 
@@ -355,6 +310,7 @@ class EvTaskSequential(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
+        using_clients.remove(self.target)
 
     @task(12)
     def heartbeat(self):
