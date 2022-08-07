@@ -180,9 +180,9 @@ def get_req_data(req, *args, **kwargs):
     elif req == "login":
         body = {"userId": userIds[target], "userPw": 'ah64jj3!'}
         header = {"Content-Type": "application/json"}
-
     elif req == "retrieveChargeStationInfo":
-        body = {"chrstnId": crgrList[target][:9]}
+        body = {"lat": 37.5100152, "lon": 126.8393359, "latFrom": 37.4596282, "latTo": 37.5604022, "lonFrom": 126.8031889,
+                "lonTo": 126.8754829, "limit": 1, "isFrscChrStn": "Y", "mbrId": f"{idTags[target]}"}
     elif req == "retrieveChargerInfo":
         body = {"crgrCid": crgrList[target]}
     elif req == "retrieveDeferredPaymentCardInfo":
