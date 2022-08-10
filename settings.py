@@ -104,16 +104,18 @@ def get_req_dataset(req, *args, **kwargs):
         body = {"ordrNo":args[0]}
 
     elif req == "statusNotification":
-        body = {'connectorId': '0', 'errorCode': 'NoError', 'info': {'reason': 'None', 'cpv': 100, 'rv': 11},
+        body = {'connectorId': '1', 'errorCode': 'NoError', 'info': {'reason': 'None', 'cpv': 100, 'rv': 11},
                 'status': args[0], 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
                 'vendorErrorCode': '', 'vendorId': 'LGE'}
     elif req == "tariff":
-        body = {'venderId': 'LG', 'messageId': 'Tariff',
-                'data': {'connectorId': '0', 'idTag': idTags[target],
+        body = {'venderId': 'LG', 'messageId': 'tariff',
+                'data': {'connectorId': '1', 'idTag': idTags[target],
                          'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z'}}
     elif req == "startTransaction":
-        body = {'idTag': idTags[target], 'connectorId': '0', 'meterStart': 1000,
-                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z', 'reservationId':args[0]}
+        body = {'idTag': idTags[target], 'connectorId': '1', 'meterStart': 1000,
+                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z'}
+        if args[0] is not None:
+            body['reservationId'] = args[0]
     elif req == "heartbeat":
         body = {"vendorId":"LGE", "messageId":"heartbeat",
                 "data":{"rssi":80,"snr":57, "rsrp":70 }}
@@ -121,7 +123,7 @@ def get_req_dataset(req, *args, **kwargs):
         body = {'idTag': idTags[target], 'meterStop': 2000, 'reason': 'Finished',
                 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z', 'transactionId': args[0]}
     elif req == "meterValues":
-        body = {'connectorId': '0', 'transactionId': args[0],
+        body = {'connectorId': '1', 'transactionId': args[0],
                 'meterValue': [{'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
                                 'sampledValue': [
                                      {'measurand': 'Energy.Active.Import.Register', 'unit': 'Wh', 'value': 1000+args[1]},
