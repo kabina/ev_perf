@@ -1,6 +1,6 @@
 import datetime
 
-client_size = 200
+client_size = 300
 charger_host = "http://stgevspcharger.uplus.co.kr"
 service_host = "http://api.stgevsp.uplus.co.kr"
 deferred_host = "http://dev"
@@ -91,12 +91,13 @@ def get_req_dataset(req, *args, **kwargs):
                 "lonTo": 126.8754829, "limit": 1, "isFrscChrStn": "Y", "mbrId": f"{idTags[target]}"}
     elif req == "retrieveChargerInfo":
         body = {"crgrCid": crgrList[target]}
+
     elif req == "retrieveDeferredPaymentCardInfo":
         body = {}
     elif req == "insertOrder":
         body = {"reqEtfnQt":40,"reqEtfnAmt":9000,"chrstnId":crgrList[target][:9],"crgrCid":crgrList[target],
                 "ordrDivsCd":"01","etfnUprcAmt":225,"serverFrom":"svc","etfnQt":40,"etfnAmt":9000,"ordrCntnCd":"01"}
-        header["authorization"] = f'Bearer {args[0]}'
+
     elif req == "updateOrder":
         body = {"ordrNo":args[0],"ordrRsltCd":"03"}
 
@@ -114,8 +115,6 @@ def get_req_dataset(req, *args, **kwargs):
     elif req == "startTransaction":
         body = {'idTag': idTags[target], 'connectorId': '1', 'meterStart': 1000,
                 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z'}
-        if args[0] is not None:
-            body['reservationId'] = args[0]
     elif req == "heartbeat":
         body = {"vendorId":"LGE", "messageId":"heartbeat",
                 "data":{"rssi":80,"snr":57, "rsrp":70 }}
@@ -130,7 +129,9 @@ def get_req_dataset(req, *args, **kwargs):
                                 ]}]}
     elif req == "retrieveChargingValues":
         body = {'ordrNo': args[1], 'mbrId':userIds[target]}
-        header["Authorization"] = f'Bearer {args[0]}'
+
+    if 'accessToken' in kwargs :
+        header["Authorization"] = f'{kwargs["accessToken"]}'
 
     return {"header":header, "body":body}
 

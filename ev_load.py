@@ -7,7 +7,7 @@ import json, random, datetime
 from locust.user import task
 from settings import get_req_dataset, urls
 
-client_size = 200
+client_size = 300
 client_list = [i for i in range(client_size)]
 using_clients = list()
 
@@ -30,23 +30,16 @@ class OneServer(SequentialTaskSet):
         super().__init__(*args, **kwargs)
         self.target = -1
         self.meter = 0
+        self.accessToken = None
 
     def get_req_data(self, *args, **kwargs):
-        return get_req_dataset(*args, **kwargs, target=self.target)
+        return get_req_dataset(*args, **kwargs, target=self.target, accessToken=self.accessToken)
 
-    @task
-    def login(self):
-        self.target = get_target()
+
+    def on_start(self):
+
         self.meter = 0
         self.accessToken
-
-        # while True:
-        #     self.target = random.choice(client_list)
-        #     if self.target not in using_clients:
-        #         using_clients.append(self.target)
-        #         break
-        # print(f'App Client:{len(using_clients)}개')
-        # print(f'App {using_clients}')
 
         req_name = "login"
         req = self.get_req_data(req_name, init=True)
@@ -64,6 +57,7 @@ class OneServer(SequentialTaskSet):
     def retrieveChargeStationInfo(self):
         req_name = "retrieveChargeStationInfo"
         req = self.get_req_data(req_name)
+        self.target = get_target()
 
         response = self.client.post(
             url=urls[req_name],
@@ -87,24 +81,50 @@ class OneServer(SequentialTaskSet):
         )
         remove_target(self.target)
 
+    @task
+    def insertOrder(self):
+        req_name = "insertOrder"
+        req = self.get_req_data(req_name)
+
+        response = self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+        self.tid = response.json()['ordrNo']
+
+    @task
+    def updateOrder(self):
+        req_name = "updateOrder"
+        req = self.get_req_data(req_name, self.tid, self.accessToken)
+
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
+
+
 class EvMobileTaskSequence(SequentialTaskSet):
 
     tid = None
-    accessToken = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.target = -1
         self.meter = 0
+        self.accessToken = None
 
     def get_req_data(self, *args, **kwargs):
-        return get_req_dataset(*args, **kwargs, target=self.target)
+        return get_req_dataset(*args, **kwargs, target=self.target, accessToken=self.accessToken)
 
-    @task
-    def login(self):
+    def on_start(self):
         self.target = get_target()
         self.meter = 0
-        self.accessToken
 
         # while True:
         #     self.target = random.choice(client_list)
@@ -155,7 +175,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     @task
     def insertOrder(self):
         req_name = "insertOrder"
-        req = self.get_req_data(req_name, self.accessToken)
+        req = self.get_req_data(req_name)
 
         response = self.client.post(
             url=urls[req_name],
@@ -233,7 +253,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     @task
     def retrieveChargingValues(self):
         req_name = "retrieveChargingValues"
-        req = self.get_req_data(req_name, self.accessToken, self.tid)
+        req = self.get_req_data(req_name, self.tid)
         response = self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -427,8 +447,8 @@ class WebUser(HttpUser):
     wait_time = between(0.3,0.5)
 
 class Charger(HttpUser):
-    tasks ={EvTaskSequential:1, EvMobileTaskSequence:1}
+    # tasks ={EvTaskSequential:1, EvMobileTaskSequence:1}
     # tasks =[EvMobileTaskSequence]
     # tasks =[EvTaskSequential]
     tasks =[OneServer]
-    wait_time = between(0.3,0.5)
+    wait_time = between(0.1,0.3)
