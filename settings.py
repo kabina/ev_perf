@@ -1,8 +1,8 @@
 import datetime
 
 client_size = 300
-charger_host = "http://stgevspcharger.uplus.co.kr"
-service_host = "http://api.stgevsp.uplus.co.kr"
+charger_host = "http://devevspcharger.uplus.co.kr"
+service_host = "http://api.devevsp.uplus.co.kr"
 deferred_host = "http://dev"
 
 def getConnection():
@@ -70,10 +70,16 @@ userPasswords = ['qwer1234!' for i in range(client_size)]
 
 
 def get_req_dataset(req, *args, **kwargs):
-    target = kwargs["target"]
+
+    target = kwargs.get('target', None)
+    tid = kwargs.get('tid', None)
+    accessToken = kwargs.get('accessToken', None)
+    ri = kwargs.get('ri', None)
+    status = kwargs.get('status', 'Available')
+    meter = kwargs.get('meter', 0)
 
     header = {'Content-type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-cache',
-               'Pragma': 'no-cache', 'X-EVC-RI': f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}_card" , 'X-EVC-BOX': crgrList[target],
+               'Pragma': 'no-cache', 'X-EVC-RI': ri , 'X-EVC-BOX': crgrList[target],
                'X-EVC-MDL': 'LGE-123', 'X-EVC-OS': 'Linux 5.5'
               }
 
@@ -99,14 +105,14 @@ def get_req_dataset(req, *args, **kwargs):
                 "ordrDivsCd":"01","etfnUprcAmt":225,"serverFrom":"svc","etfnQt":40,"etfnAmt":9000,"ordrCntnCd":"01"}
 
     elif req == "updateOrder":
-        body = {"ordrNo":args[0],"ordrRsltCd":"03"}
+        body = {"ordrNo":tid,"ordrRsltCd":"03"}
 
     elif req == "sendStartChargeStatus":
-        body = {"ordrNo":args[0]}
+        body = {"ordrNo":tid}
 
     elif req == "statusNotification":
         body = {'connectorId': '1', 'errorCode': 'NoError', 'info': {'reason': 'None', 'cpv': 100, 'rv': 11},
-                'status': args[0], 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
+                'status': status, 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
                 'vendorErrorCode': '', 'vendorId': 'LGE'}
     elif req == "tariff":
         body = {'venderId': 'LG', 'messageId': 'tariff',
@@ -115,23 +121,27 @@ def get_req_dataset(req, *args, **kwargs):
     elif req == "startTransaction":
         body = {'idTag': idTags[target], 'connectorId': '1', 'meterStart': 1000,
                 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z'}
+    elif req == "startTransactionRemote":
+        body = {'idTag': idTags[target], 'connectorId': '1', 'meterStart': 1000,
+                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
+                'reservationId':tid}
     elif req == "heartbeat":
         body = {"vendorId":"LGE", "messageId":"heartbeat",
                 "data":{"rssi":80,"snr":57, "rsrp":70 }}
     elif req == "stopTransaction":
         body = {'idTag': idTags[target], 'meterStop': 2000, 'reason': 'Finished',
-                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z', 'transactionId': args[0]}
+                'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z', 'transactionId': tid}
     elif req == "meterValues":
-        body = {'connectorId': '1', 'transactionId': args[0],
+        body = {'connectorId': '1', 'transactionId': tid,
                 'meterValue': [{'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
                                 'sampledValue': [
-                                     {'measurand': 'Energy.Active.Import.Register', 'unit': 'Wh', 'value': 1000+args[1]},
+                                     {'measurand': 'Energy.Active.Import.Register', 'unit': 'Wh', 'value': 1000+meter},
                                 ]}]}
     elif req == "retrieveChargingValues":
-        body = {'ordrNo': args[1], 'mbrId':userIds[target]}
+        body = {'ordrNo': tid, 'mbrId':userIds[target]}
 
-    if 'accessToken' in kwargs :
-        header["Authorization"] = f'{kwargs["accessToken"]}'
+    if ri is not None and ri.endswith('app') :
+        header["Authorization"] = accessToken
 
     return {"header":header, "body":body}
 
@@ -143,6 +153,8 @@ urls = {
     "prepare":charger_host+"/api/v1/OCPP/statusNotification/999332",
     "tariff":charger_host+"/api/v1/OCPP/dataTransfer/999332",
     "startTransaction":charger_host+"/api/v1/OCPP/startTransaction/999332",
+    "startTransactionRemote": charger_host + "/api/v1/OCPP/startTransaction/999332",
+
     "stopTransaction":charger_host+"/api/v1/OCPP/stopTransaction/999332",
     "meterValues":charger_host+"/api/v1/OCPP/meterValues/999332",
     "statusNotification": charger_host + "/api/v1/OCPP/statusNotification/999332",

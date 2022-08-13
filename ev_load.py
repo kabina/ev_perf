@@ -1,5 +1,5 @@
 '''
-    locust -f ev_load.py EvLocus --host https://stgevspcharger.uplus.co.kr
+    locust -f ev_load.py Charger --host https://stgevspcharger.uplus.co.kr
 
 '''
 from locust import HttpUser, SequentialTaskSet,between
@@ -111,16 +111,17 @@ class OneServer(SequentialTaskSet):
 
 class EvMobileTaskSequence(SequentialTaskSet):
 
-    tid = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.target = -1
         self.meter = 0
         self.accessToken = None
+        self.tid = None
+        self.ri = None
 
     def get_req_data(self, *args, **kwargs):
-        return get_req_dataset(*args, **kwargs, target=self.target, accessToken=self.accessToken)
+        return get_req_dataset(*args, **kwargs, target=self.target, accessToken=self.accessToken, tid=self.tid, ri = self.ri)
 
     def on_start(self):
         self.target = get_target()
@@ -150,6 +151,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     def retrieveChargeStationInfo(self):
         req_name = "retrieveChargeStationInfo"
         req = self.get_req_data(req_name)
+        self.ri = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}_app"
 
         response = self.client.post(
             url=urls[req_name],
@@ -202,7 +204,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     @task
     def sendStartChargeStatus(self):
         req_name = "sendStartChargeStatus"
-        req = self.get_req_data(req_name, self.tid)
+        req = self.get_req_data(req_name)
 
         self.client.post(
             url=urls[req_name],
@@ -213,9 +215,9 @@ class EvMobileTaskSequence(SequentialTaskSet):
         )
 
     @task
-    def startTransaction(self):
-        req_name = "startTransaction"
-        req = self.get_req_data(req_name, self.tid)
+    def startTransactionRemote(self):
+        req_name = "startTransactionRemote"
+        req = self.get_req_data(req_name)
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -241,7 +243,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     def meterValues(self):
         req_name = "meterValues"
         self.meter += 10
-        req = self.get_req_data(req_name, self.tid, self.meter)
+        req = self.get_req_data(req_name, meter=self.meter)
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -253,7 +255,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     @task
     def retrieveChargingValues(self):
         req_name = "retrieveChargingValues"
-        req = self.get_req_data(req_name, self.tid)
+        req = self.get_req_data(req_name)
         response = self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -265,7 +267,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     @task
     def stopTransaction(self):
         req_name = "stopTransaction"
-        req = self.get_req_data(req_name, self.tid)
+        req = self.get_req_data(req_name)
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -277,7 +279,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
     @task
     def statusNotificationFinishing(self):
         req_name = "statusNotification"
-        req = self.get_req_data(req_name, "Finishing")
+        req = self.get_req_data(req_name, status="Finishing")
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -301,13 +303,12 @@ class EvMobileTaskSequence(SequentialTaskSet):
 
 class EvTaskSequential(SequentialTaskSet):
 
-    tid = None
-    lid = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}_card"
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.target = -1
         self.meter = 0
+        self.ri = None
+        self.tid = None
 
     def get_req_data(self, *args, **kwargs):
         return get_req_dataset(*args, **kwargs, target=self.target)
@@ -321,6 +322,7 @@ class EvTaskSequential(SequentialTaskSet):
 
         req_name = "statusNotification"
         req = self.get_req_data(req_name, "Available")
+        self.ri = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]}_card"
 
         self.client.post(
             url=urls[req_name],
@@ -334,18 +336,20 @@ class EvTaskSequential(SequentialTaskSet):
     def authorize(self):
         req_name = "authorize"
         req = self.get_req_data(req_name)
-        self.client.post(
+        response = self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
             auth=None,
             headers=req["header"],
             name=req_name,
         )
+        print(response)
+        print(response.json())
 
     @task
     def statusNotificationPreparing(self):
         req_name = "statusNotification"
-        req = self.get_req_data(req_name, "Preparing")
+        req = self.get_req_data(req_name, status="Preparing")
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -383,7 +387,7 @@ class EvTaskSequential(SequentialTaskSet):
     @task
     def statusNotificationCharging(self):
         req_name = "statusNotification"
-        req = self.get_req_data(req_name, "Charging")
+        req = self.get_req_data(req_name, status="Charging")
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -396,7 +400,7 @@ class EvTaskSequential(SequentialTaskSet):
     def meterValues(self):
         req_name = "meterValues"
         self.meter += 10
-        req = self.get_req_data(req_name, self.tid, self.meter)
+        req = self.get_req_data(req_name, meter=self.meter)
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -408,7 +412,7 @@ class EvTaskSequential(SequentialTaskSet):
     @task
     def stopTransaction(self):
         req_name = "stopTransaction"
-        req = self.get_req_data(req_name, self.tid)
+        req = self.get_req_data(req_name)
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -420,7 +424,7 @@ class EvTaskSequential(SequentialTaskSet):
     @task
     def statusNotificationFinishing(self):
         req_name = "statusNotification"
-        req = self.get_req_data(req_name, "Finishing")
+        req = self.get_req_data(req_name, status="Finishing")
         self.client.post(
             url=urls[req_name],
             data=json.dumps(req["body"]),
@@ -448,7 +452,7 @@ class WebUser(HttpUser):
 
 class Charger(HttpUser):
     # tasks ={EvTaskSequential:1, EvMobileTaskSequence:1}
-    # tasks =[EvMobileTaskSequence]
+    tasks =[EvMobileTaskSequence]
     # tasks =[EvTaskSequential]
-    tasks =[OneServer]
+    # tasks =[OneServer]
     wait_time = between(0.1,0.3)
