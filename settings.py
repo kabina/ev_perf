@@ -1,8 +1,8 @@
 import datetime
 
 client_size = 300
-charger_host = "http://devevspcharger.uplus.co.kr"
-service_host = "http://api.devevsp.uplus.co.kr"
+charger_host = "http://stgevspcharger.uplus.co.kr"
+service_host = "http://api.stgevsp.uplus.co.kr"
 deferred_host = "http://dev"
 
 def getConnection():
@@ -18,7 +18,7 @@ def getCards():
                     " from mbr_info a "+
                     " inner join mbr_card_isu_info b "+
                     " on a.mbr_id = b.mbr_id "+
-                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'N' and b.mbr_card_no like '4%' "
+                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'n' and b.mbr_card_no like '4%' "
                     f" and a.mbr_id like '%voltup.com' limit {client_size}")
         fetches = cur.fetchall()
         with open('dataset/idTags', 'w') as f:
@@ -131,6 +131,8 @@ def get_req_dataset(req, *args, **kwargs):
     elif req == "stopTransaction":
         body = {'idTag': idTags[target], 'meterStop': 2000, 'reason': 'Finished',
                 'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z', 'transactionId': tid}
+    elif req == "remoteStopTransaction":
+        body = {"ordrNo":tid}
     elif req == "meterValues":
         body = {'connectorId': '1', 'transactionId': tid,
                 'meterValue': [{'timestamp': f'{datetime.datetime.now().replace(microsecond=0).isoformat()}Z',
@@ -142,7 +144,9 @@ def get_req_dataset(req, *args, **kwargs):
 
     if ri is not None and ri.endswith('app') :
         header["Authorization"] = accessToken
-
+    # print(header)
+    # print("-"*50)
+    # print(body)
     return {"header":header, "body":body}
 
 
@@ -158,7 +162,7 @@ urls = {
     "stopTransaction":charger_host+"/api/v1/OCPP/stopTransaction/999332",
     "meterValues":charger_host+"/api/v1/OCPP/meterValues/999332",
     "statusNotification": charger_host + "/api/v1/OCPP/statusNotification/999332",
-
+    "remoteStopTransaction": service_host + "/pub-api/v1/HMN/sendStopChargeStatus",
     "validateMemberId": service_host+"/pub-api/v1/MIF/validateMemberId",
     "login": service_host + "/cmm-api/v1/AUTH/login",
     "retrieveChargeStationInfo": service_host + "/pub-api/v1/HMN/retrieveChargeStationInfo",
