@@ -5,9 +5,9 @@
 from locust import HttpUser, SequentialTaskSet,between
 import json, random, datetime
 from locust.user import task
-from settings import get_req_dataset, urls
+from settings import get_req_dataset, urls, crgrList
 
-client_size = 300
+client_size = 5
 client_list = [i for i in range(client_size)]
 using_clients = list()
 
@@ -196,7 +196,10 @@ class EvMobileTaskSequence(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
-        self.tid = response.json()['ordrNo']
+
+        self.tid = response.json()['data']['ordrNo']
+        print(f'tid:{self.tid}')
+
         # print(self.tid)
 
     @task
@@ -224,20 +227,21 @@ class EvMobileTaskSequence(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
-    #
-    # @task
-    # def startTransactionRemote(self):
-    #     req_name = "startTransactionRemote"
-    #     req = self.get_req_data(req_name)
-    #     self.client.post(
-    #         url=urls[req_name],
-    #         data=json.dumps(req["body"]),
-    #         auth=None,
-    #         headers=req["header"],
-    #         name=req_name,
-    #     )
 
+    @task
+    def startTransactionRemote(self):
+        req_name = "startTransactionRemote"
+        req = self.get_req_data(req_name)
+        self.client.post(
+            url=urls[req_name],
+            data=json.dumps(req["body"]),
+            auth=None,
+            headers=req["header"],
+            name=req_name,
+        )
 
+    """remoteStartTransaction
+    """
     @task
     def statusNotificationCharging(self):
         req_name = "statusNotification"
@@ -250,7 +254,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
             name=req_name,
         )
 
-    @task(10)
+    @task(5)
     def meterValues(self):
         req_name = "meterValues"
         self.meter += 10
@@ -363,7 +367,7 @@ class EvTaskSequential(SequentialTaskSet):
         req_name = "authorize"
         req = self.get_req_data(req_name)
         response = self.client.post(
-            url=urls[req_name],
+            url=f'{urls[req_name]}{crgrList[self.target][:11]}',
             data=json.dumps(req["body"]),
             auth=None,
             headers=req["header"],
@@ -408,6 +412,7 @@ class EvTaskSequential(SequentialTaskSet):
             name=req_name,
         )
         if 'transactionId' in response.json() :
+            # print(response.json())
             self.tid = response.json()['transactionId']
         else:
             print(f"No Transaction Id : {response}")

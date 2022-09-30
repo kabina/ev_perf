@@ -1,9 +1,9 @@
 import datetime
 
-client_size = 300
-charger_host = "http://stgevspcharger.uplus.co.kr"
-service_host = "http://api.stgevsp.uplus.co.kr"
-deferred_host = "http://dev"
+client_size = 5
+server = 'stg'
+charger_host = f"http://{server}evspcharger.uplus.co.kr"
+service_host = f"http://api.{server}evsp.uplus.co.kr"
 
 def getConnection():
     import pymysql
@@ -14,26 +14,28 @@ def getConnection():
 def getCards():
     conn = getConnection()
     with conn.cursor() as cur:
-        cur.execute(" select b.mbr_card_no "+
+        cur.execute(" select a.emal_addr, b.mbr_card_no "+
                     " from mbr_info a "+
-                    " inner join mbr_card_isu_info b "+
-                    " on a.mbr_id = b.mbr_id "+
-                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'n' and b.mbr_card_no like '4%' "
-                    f" and a.mbr_id like '%voltup.com' limit {client_size}")
+                    " inner join mbr_card_isu_info b on a.mbr_id = b.mbr_id " +
+                    " inner join mbr_etc_info c on a.mbr_id = c.mbr_id"+
+                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'n' and b.mbr_card_no like '10%' "
+                    f" and a.mbr_id like '100%'  "
+                    f" and c.pp_entr_yn = 'N' "
+                    f" limit {client_size}")
         fetches = cur.fetchall()
         with open('dataset/idTags', 'w') as f:
             for i in fetches:
-                f.write(f'{i[0]}\n')
+                f.write(f'{i[0]} {i[1]}\n')
 
-        return [i[0] for i in fetches]
+        return [(i[0],i[1]) for i in fetches]
 
 def getUserIds():
     conn = getConnection()
     with conn.cursor() as cur:
-        cur.execute(" select mbr_id "+
+        cur.execute(" select emal_addr "+
                     " from mbr_info a "+
-                    f" where a.mbr_stus_cd = '01' and a.mbr_id like 'k%' "
-                    f" and a.mbr_id like '%voltup.com' limit {client_size}")
+                    f" where a.mbr_stus_cd = '01' and a.mbr_id like '100%' "
+                    f" and a.mbr_id like '100%' limit {client_size}")
         fetches = cur.fetchall()
         with open('dataset/UserIds', 'w') as f:
             for i in fetches:
@@ -62,13 +64,16 @@ def getCrgrs(chrstn_id = None):
 
         return [i[0] for i in fetches]
 
+idncard = getCards()
+idTags = [c[1] for c in idncard]
+userIds = [c[0] for c in idncard]
 
-idTags = getCards()
 crgrList = getCrgrs()
-userIds = getUserIds()
-userPasswords = ['qwer1234!' for i in range(client_size)]
+print(userIds)
 
+userPasswords = ['asdf1234!!' for i in range(client_size)]
 
+#asdf1234!!
 def get_req_dataset(req, *args, **kwargs):
 
     target = kwargs.get('target', None)
@@ -143,7 +148,7 @@ def get_req_dataset(req, *args, **kwargs):
         body = {'ordrNo': tid, 'mbrId':userIds[target]}
 
     if ri is not None and ri.endswith('app') :
-        header["Authorization"] = accessToken
+        header["Authorization"] = f'{accessToken}'
     # print(header)
     # print("-"*50)
     # print(body)
@@ -151,7 +156,7 @@ def get_req_dataset(req, *args, **kwargs):
 
 
 urls = {
-    "authorize":charger_host+"/api/v1/OCPP/authorize/999332",
+    "authorize":charger_host+"/api/v1/OCPP/authorize/",
     "bootNotification":charger_host+"/api/v1/OCPP/bootNotification/999332",
     "heartbeat":charger_host+"/api/v1/OCPP/dataTransfer/999332",
     "prepare":charger_host+"/api/v1/OCPP/statusNotification/999332",
