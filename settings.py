@@ -18,9 +18,9 @@ def getCards():
                     " from mbr_info a "+
                     " inner join mbr_card_isu_info b on a.mbr_id = b.mbr_id " +
                     " inner join mbr_etc_info c on a.mbr_id = c.mbr_id"+
-                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'n' and b.mbr_card_no like '10%' "
-                    f" and a.mbr_id like '100%'  "
-                    f" and c.pp_entr_yn = 'N' "
+                    f" where b.card_stus_cd = '01' and b.grp_card_yn = 'n' and b.mbr_card_no like '10%' "+
+                    f" and a.mbr_id like '100%'  "+
+                    f" and c.pp_entr_yn = 'N' "+
                     f" limit {client_size}")
         fetches = cur.fetchall()
         with open('dataset/idTags', 'w') as f:
@@ -51,7 +51,8 @@ def getCrgrs(chrstn_id = None):
               " from crgr_mstr_info a " \
               " inner join crgr_info b " \
               " on a.crgr_mid = b.crgr_mid " \
-              f" where a.crgr_stus_cd = '04' and b.crgr_cid like '1117%' limit {client_size}"
+              f" where a.crgr_stus_cd = '04' and b.crgr_cid like '1117%' " \
+              f" and a.crgr_rsv_mode_cd = '01' limit {client_size}"
 
         if chrstn_id :
             sql = sql + f" and a.chrstn_id = '{chrstn_id}' "

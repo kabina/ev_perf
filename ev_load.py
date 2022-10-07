@@ -153,6 +153,7 @@ class EvMobileTaskSequence(SequentialTaskSet):
             headers=req["header"],
             name=req_name,
         )
+        print(response)
         self.accessToken = response.json()['data']['payload']['accessToken']
 
     @task
